@@ -1,0 +1,640 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Balance Quest🧾</title>
+<link rel="icon" type="image/x-icon" href="logo.ico">
+<link href="https://fonts.googleapis.com/css2?family=Libre+Caslon+Text:ital,wght@0,400;0,700;1,400&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  body {
+  zoom: 1.02; 
+}
+   button {
+      background-color: #007bff;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      padding: 8px 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background-color 0.3s ease, transform 0.2s ease;
+    }
+  button:hover {
+      background-color: #0056b3;
+      transform: translateY(-2px);
+    }
+  /* ------------------------
+     Ledger book theme styles
+     ------------------------*/
+  :root{
+    --paper:#f8f3e8;      /* ledger paper */
+    --ink:#0b2545;        /* primary text */
+    --accent:#1cc0f7;     /* green accent */
+    --muted:#7b8ca0;
+    --good:#16a34a;
+    --bad:#ed1616;
+    --shadow: rgba(10,10,10,0.12);
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; min-height:100vh; font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial;
+    background: linear-gradient(180deg,#e6eef8 0%, #dbe7f4 60%);
+    display:flex; align-items:center; justify-content:center; padding:28px;
+  }
+
+  /* Notebook container */
+  .notebook {
+    width:800px; max-width:96vw; background:transparent; display:flex; gap:20px; align-items:flex-start;
+    perspective:1200px;
+  }
+
+  /* Left: info column */
+  .panel {
+    width:280px; background:transparent; display:flex; flex-direction:column; gap:12px;
+  }
+  .card {
+    background:rgba(255,255,255,0.85); border-radius:12px; padding:16px; box-shadow:0 8px 30px var(--shadow);
+    border:1px solid rgba(66, 17, 226, 0.04);
+  }
+  .brand { font-family:"Libre Caslon Text", serif; font-size:22px; color:var(--accent); font-weight:700; letter-spacing:0.6px; }
+  .muted { color:var(--muted); font-size:13px; }
+  .scorebox { display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  .scorebig { font-weight:700; font-size:20px; color:var(--ink); }
+  .levels { display:flex; flex-direction:column; gap:8px; margin-top:6px; }
+  .lev-btn { background:transparent; border:1px solid rgba(11,37,69,0.06); padding:10px; border-radius:8px; cursor:pointer; text-align:left; color:var(--ink); font-weight:600; }
+  .lev-btn.locked{ opacity:0.45; cursor:not-allowed; }
+
+  /* Right: ledger page (canvas + UI) */
+  .page-wrap { width:740px; position:relative; perspective:1000px; }
+  .page {
+    width:100%; min-height:625px; border-radius:12px; background:var(--paper); box-shadow: 0 30px 80px rgba(2,6,23,0.15);
+    overflow:hidden; position:relative; transform-origin: left center; transition: transform 700ms cubic-bezier(.2,.9,.3,1), box-shadow 300ms;
+    border: 1px solid rgba(16, 89, 184, 0.06);
+  }
+  .page.turning { transform: rotateY(-40deg) translateX(-18px) scale(0.995); box-shadow: 0 40px 100px rgba(2,6,23,0.22); }
+
+  /* canvas sits as paper texture & ruled lines */
+  #paperCanvas{ position:absolute; inset:0; width:100%; height:100%; display:block; }
+
+  /* content area (on top of canvas) */
+  .page-content{ position:relative; padding:80px; z-index:2; display:flex; flex-direction:column; gap:12px; }
+  .page-header{ display:flex; justify-content:space-between; align-items:center;  }
+  .page-title{ font-family:"Libre Caslon Text", serif; font-size:28px; color:var(--ink); }
+  .meta { color:var(--muted); font-size:16px; }
+  .question-card{ background: rgba(255,255,255,0.6); border-radius:8px; padding:12px; border:1px solid rgba(6,18,34,0.04); box-shadow: 0 6px 18px rgba(2,6,23,0.06); }
+  .transaction { font-weight:600; color:var(--ink); font-size:16px; }
+
+  /* ledger / drop zones */
+  .drop-flex{ display:flex; gap:12px; align-items:flex-start; }
+  .dropzone { flex:1; min-height:120px; border-radius:8px; padding:10px; background:rgba(255,255,255,0.45); border:1px dashed rgba(11,37,69,0.08); }
+  .dropzone .title { font-weight:700; color:var(--ink); margin-bottom:8px; }
+  .draggable{ padding:8px 10px; background:rgba(227,236,252,0.9); border-radius:6px; margin-bottom:8px; border:1px solid rgba(11,37,69,0.06); cursor:grab; user-select:none; }
+  .draggable:active{ cursor:grabbing; }
+
+  /* feedback glow animations */
+  .feedback { font-weight:700; margin-top:6px; min-height:22px; }
+  .glow-good { animation: glowGood 900ms linear; color:var(--good); }
+  .glow-bad { animation: glowBad 900ms linear; color:var(--bad); }
+  @keyframes glowGood { 0%{ text-shadow: 0 0 0 rgba(22,163,74,0.0)} 50%{ text-shadow: 0 0 18px rgba(22,163,74,0.35)} 100%{ text-shadow:0 0 0 rgba(22,163,74,0);} }
+  @keyframes glowBad { 0%{ text-shadow:0 0 0 rgba(239,68,68,0)} 50%{ text-shadow:0 0 18px rgba(239,68,68,0.35)} 100%{ text-shadow:0 0 0 rgba(239,68,68,0);} }
+
+  /* page footer */
+  .page-footer{ display:flex; justify-content:space-between; align-items:center; margin-top:6px; color:var(--muted); font-size:13px; }
+
+  /* small responsive */
+  @media (max-width:1020px){
+    .notebook{flex-direction:column; align-items:center}
+    .panel{width:92%}
+    .page-wrap{width:92%}
+  }
+</style>
+</head>
+<body>
+  <div class="notebook">
+    <!-- left panel -->
+    <div class="panel">
+      <div class="card brand">Balance Quest</div>
+
+      <div class="card scorebox">
+        <div>
+          <div class="muted">Score</div>
+          <div class="scorebig" id="score">0</div>
+        </div>
+        <div style="text-align:right">
+          <div class="muted">Level</div>
+          <div id="levelLabel" style="font-weight:700">Level 1 — Debit / Credit</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="muted">Levels</div>
+        <div class="levels" id="levelsList"></div>
+      </div>
+
+      <div class="card muted">
+        <div style="display:flex;gap:8px;align-items:center">
+          <button onclick="prevLevel()" class="alt">Prev</button>
+          <button onclick="nextLevel()" class="alt">Next</button>
+          <button onclick="resetProgress()">Reset</button>
+        </div>
+        <div style="margin-top:9px;font-size:12px">Unlocks: Lvl 2-5, Lvl 3-12, Lvl 4-25, Lvl 5-40, Lvl 6-55</div>
+      </div>
+    </div>
+
+    <!-- right ledger page -->
+    <div class="page-wrap">
+      <div id="page" class="page">
+        <canvas id="paperCanvas"></canvas>
+        <div class="page-content" id="pageContent">
+          <div class="page-header">
+            <div>
+              <div class="page-title"> Accounting books</div>
+              <div class="meta">Interactive accounting cycle — Journal → Ledger → Trial Balance → Balance Sheet</div>
+            </div>
+            <div class="inline muted" id="roundInfo">Round 0</div>
+          </div>
+
+          <div id="levelArea" class="question-card">
+            <!-- level content injected here -->
+            <div class="transaction">Loading...</div>
+          </div>
+
+          <div id="feedbackArea" class="feedback"></div>
+
+          <div class="page-footer">
+            <div id="pageNote" class="muted">Tip: drag entries to the correct column.</div>
+            <div class="muted" id="pageFooterRight"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+/* =========================
+   Canvas: draw ruled lines + margin
+   ========================= */
+const canvas = document.getElementById('paperCanvas');
+const page = document.getElementById('page');
+function fitCanvas(){
+  canvas.width = page.clientWidth * devicePixelRatio;
+  canvas.height = page.clientHeight * devicePixelRatio;
+  canvas.style.width = page.clientWidth + 'px';
+  canvas.style.height = page.clientHeight + 'px';
+  drawPaper();
+}
+function drawPaper(){
+  const ctx = canvas.getContext('2d');
+  ctx.save();
+  ctx.scale(devicePixelRatio, devicePixelRatio);
+  const w = page.clientWidth, h = page.clientHeight;
+  ctx.clearRect(0,0,w,h);
+  // paper tint
+  ctx.fillStyle = '#fbf6ee';
+  ctx.fillRect(0,0,w,h);
+  // left margin - red vertical line
+  const marginX = 56;
+  ctx.strokeStyle = 'rgba(200,60,60,0.6)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(marginX, 10); ctx.lineTo(marginX, h-10); ctx.stroke();
+  // ruled lines (thin blue)
+  ctx.strokeStyle = 'rgba(50,100,150,0.12)';
+  ctx.lineWidth = 1;
+  const gap = 28;
+  for(let y = 40; y < h-20; y += gap){
+    ctx.beginPath(); ctx.moveTo(12, y); ctx.lineTo(w-12, y); ctx.stroke();
+  }
+  // subtle texture dots
+  ctx.fillStyle = 'rgba(0,0,0,0.02)';
+  for(let i=0;i<600;i++){
+    const x = Math.random() * w, y = Math.random() * h;
+    ctx.fillRect(x, y, 0.6, 0.6);
+  }
+  ctx.restore();
+}
+window.addEventListener('resize', fitCanvas);
+fitCanvas();
+
+/* =========================
+   Core Data (unchanged semantics)
+   ========================= */
+const transactions = [
+  { text:"Bought furniture for cash ₹10,000", debit:"Furniture A/c", credit:"Cash A/c", amount:10000, type:"real" },
+  { text:"Sold goods for cash ₹5,000", debit:"Cash A/c", credit:"Sales A/c", amount:5000, type:"nominal" },
+  { text:"Paid rent ₹2,000", debit:"Rent A/c", credit:"Cash A/c", amount:2000, type:"nominal" },
+  { text:"Owner invested cash ₹50,000", debit:"Cash A/c", credit:"Capital A/c", amount:50000, type:"personal" },
+  { text:"Bought goods on credit from Raj ₹6,000", debit:"Purchases A/c", credit:"Raj A/c", amount:6000, type:"personal" },
+  { text:"Paid salary ₹4,000", debit:"Salary A/c", credit:"Cash A/c", amount:4000, type:"nominal" },
+  { text:"Received commission ₹1,500", debit:"Cash A/c", credit:"Commission A/c", amount:1500, type:"nominal" },
+  { text:"Aman bought goods on credit ₹8,000", debit:"Aman A/c", credit:"Sales A/c", amount:8000, type:"personal" },
+  { text:"Received ₹3,000 from Aman", debit:"Cash A/c", credit:"Aman A/c", amount:3000, type:"personal" },
+  { text:"Owner withdrew cash for personal use ₹3,000", debit:"Drawings A/c", credit:"Cash A/c", amount:3000, type:"personal" }
+];
+const tbItems = [
+  {account:"Cash A/c", amount:38000},
+  {account:"Furniture A/c", amount:10000},
+  {account:"Capital A/c", amount:50000},
+  {account:"Purchases A/c", amount:6000},
+  {account:"Sales A/c", amount:13000},
+  {account:"Salary A/c", amount:4000},
+  {account:"Raj A/c", amount:4000},
+  {account:"Aman A/c", amount:5000}
+];
+const closingBalances = [
+  {account:"Cash A/c", amount:38000},
+  {account:"Furniture A/c", amount:10000},
+  {account:"Capital A/c", amount:50000},
+  {account:"Purchases A/c", amount:6000},
+  {account:"Sales A/c", amount:13000},
+  {account:"Salary A/c", amount:4000},
+  {account:"Raj A/c", amount:4000}
+];
+const accounts = Array.from(new Set(transactions.flatMap(t=>[t.debit,t.credit])));
+
+/* =========================
+   State + helpers (unchanged)
+   ========================= */
+let state = {
+  score: 0,
+  unlocked: {1:true,2:false,3:false,4:false,5:false,6:false},
+  currentLevel: 1,
+  round: 0,
+  maxRounds: {1:8,2:6,3:5,4:5,5:1,6:1}
+};
+const $ = id => document.getElementById(id);
+function setScore(v){ state.score = v; $('score').innerText = state.score; applyUnlocks(); }
+function addScore(d){ setScore(state.score + d); }
+function applyUnlocks(){
+  if(state.score >= 5) state.unlocked[2] = true;
+  if(state.score >= 12) state.unlocked[3] = true;
+  if(state.score >= 25) state.unlocked[4] = true;
+  if(state.score >= 40) state.unlocked[5] = true;
+  if(state.score >= 55) state.unlocked[6] = true;
+  renderLevelsList();
+}
+function random(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+
+/* =========================
+   UI helpers: page-turn + feedback glow
+   ========================= */
+function pageTurn(effectDuration=700, cb){
+  const el = $('page');
+  el.classList.add('turning');
+  setTimeout(()=> {
+    el.classList.remove('turning');
+    if(cb) cb();
+  }, effectDuration);
+}
+function showFeedback(text, ok=true){
+  const f = $('feedbackArea');
+  f.classList.remove('glow-good','glow-bad');
+  f.innerText = text;
+  if(ok) f.classList.add('glow-good'); else f.classList.add('glow-bad');
+  // clear after short while
+  setTimeout(()=> { f.classList.remove('glow-good','glow-bad'); }, 900);
+}
+
+/* =========================
+   Level list rendering (side panel)
+   ========================= */
+function renderLevelsList(){
+  const list = $('levelsList'); list.innerHTML = '';
+  for(let i=1;i<=6;i++){
+    const b = document.createElement('button');
+    b.className = 'lev-btn' + (state.unlocked[i] ? '' : ' locked');
+    b.innerText = `Level ${i} ${levelName(i)}` + (state.unlocked[i] ? '' : ' (locked)');
+    b.disabled = !state.unlocked[i];
+    b.addEventListener('click', ()=> {
+      if(!state.unlocked[i]) return alert('Locked');
+      state.currentLevel = i; state.round=0; pageTurn(540, ()=> renderCurrentLevel());
+    });
+    list.appendChild(b);
+  }
+}
+
+/* =========================
+   Level names + navigation (kept same logic)
+   ========================= */
+function levelName(n){
+  return {1:'(Debit/Credit)',2:'(Account Type)',3:'(Journal Builder)',4:'(Ledger Posting)',5:'(Trial Balance)',6:'(Balance Sheet)'}[n];
+}
+function renderCurrentLevel(){ $('levelLabel').innerText = `Level ${state.currentLevel} — ${levelName(state.currentLevel)}`; renderLevelsList(); pageTurn(380, ()=> { const area = $('levelArea'); area.innerHTML = ''; switch(state.currentLevel){ case 1: level1.init(area); break; case 2: level2.init(area); break; case 3: level3.init(area); break; case 4: level4ledger.init(area); break; case 5: level5trial.init(area); break; case 6: level6balance.init(area); break; } }); }
+function prevLevel(){ if(state.currentLevel>1){ state.currentLevel--; renderCurrentLevel(); } }
+function nextLevel(){ if(state.currentLevel<6 && state.unlocked[state.currentLevel+1]){ state.currentLevel++; renderCurrentLevel(); } else alert('Locked or end.'); }
+function resetProgress(){ if(confirm('Reset progress and leaderboard?')){ setScore(0); state.unlocked = {1:true,2:false,3:false,4:false,5:false,6:false}; state.currentLevel = 1; state.round = 0; localStorage.removeItem('bq_leaderboard'); renderLevelsList(); renderCurrentLevel(); showFeedback('Progress reset', true); } }
+
+/* =========================
+   LEVEL 1 MODULE (Debit/Credit) — same logic
+   ========================= */
+const level1 = (function(){
+  function init(container){
+    state.round = 0; next(container);
+  }
+  function next(container){
+    state.round++;
+    $('roundInfo').innerText = `Round ${state.round}/${state.maxRounds[1]}`;
+    if(state.round > state.maxRounds[1]) return finish(1);
+    const txn = random(transactions);
+    container.innerHTML = `
+      <div class="transaction"><b>Transaction:</b> ${txn.text}</div>
+      <div style="margin-top:12px;display:flex;gap:10px">
+        <button id="l1-debit" class="btn">Debit</button>
+        <button id="l1-credit" class="btn">Credit</button>
+      </div>
+    `;
+    $('l1-debit').addEventListener('click', ()=> { answer('debit', txn); });
+    $('l1-credit').addEventListener('click', ()=> { answer('credit', txn); });
+  }
+  function answer(choice, txn){
+    const correctSide = 'debit';
+    if(choice === correctSide){ addScore(1); showFeedback('Correct — Debit side', true); }
+    else { addScore(-1); showFeedback(`Wrong — debit is ${txn.debit}`, false); }
+    setTimeout(()=> { if(state.currentLevel===1) next($('levelArea')); }, 700);
+  }
+  return { init };
+})();
+
+/* =========================
+   LEVEL 2 MODULE (Account Type)
+   ========================= */
+const level2 = (function(){
+  function init(container){
+    state.round = 0; next(container);
+  }
+  function next(container){
+    state.round++;
+    $('roundInfo').innerText = `Round ${state.round}/${state.maxRounds[2]}`;
+    if(state.round > state.maxRounds[2]) return finish(2);
+    const txn = random(transactions);
+    container.innerHTML = `
+      <div class="transaction"><b>Transaction:</b> ${txn.text}</div>
+      <div class="muted" style="margin-top:10px">Which account type is <b>${txn.debit}</b> ?</div>
+      <div style="margin-top:8px;display:flex;gap:8px">
+        <button id="l2-personal">Personal</button>
+        <button id="l2-real">Real</button>
+        <button id="l2-nominal">Nominal</button>
+      </div>
+    `;
+    $('l2-personal').addEventListener('click', ()=> answer(txn.type,'personal'));
+    $('l2-real').addEventListener('click', ()=> answer(txn.type,'real'));
+    $('l2-nominal').addEventListener('click', ()=> answer(txn.type,'nominal'));
+  }
+  function answer(correct, choice){
+    if(correct===choice){ addScore(2); showFeedback('Correct — good job', true); }
+    else { addScore(-1); showFeedback(`Wrong — correct is ${correct}`, false); }
+    setTimeout(()=> { if(state.currentLevel===2) next($('levelArea')); }, 700);
+  }
+  return { init };
+})();
+
+/* =========================
+   LEVEL 3 MODULE (Journal Entry Builder)
+   ========================= */
+const level3 = (function(){
+  function init(container){
+    state.round = 0; next(container);
+  }
+  function next(container){
+    state.round++;
+    $('roundInfo').innerText = `Round ${state.round}/${state.maxRounds[3]}`;
+    if(state.round > state.maxRounds[3]) return finish(3);
+    const txn = random(transactions);
+    container.innerHTML = `
+      <div class="transaction"><b>Transaction:</b> ${txn.text}</div>
+      <div style="margin-top:10px">
+        <label class="muted">Debit</label>
+        <select id="l3-debit">${accounts.map(a=>`<option value="${a}">${a}</option>`).join('')}</select>
+        <label class="muted" style="margin-top:8px">Credit</label>
+        <select id="l3-credit">${accounts.map(a=>`<option value="${a}">${a}</option>`).join('')}</select>
+        <label class="muted" style="margin-top:8px">Amount</label>
+        <input id="l3-amt" type="number" value="${txn.amount}" />
+      </div>
+      <div style="margin-top:10px;display:flex;gap:8px">
+        <button id="l3-submit">Submit Entry</button>
+        <button id="l3-skip" class="alt">Skip (-1)</button>
+      </div>
+    `;
+    $('l3-submit').addEventListener('click', ()=> answer(txn));
+    $('l3-skip').addEventListener('click', ()=> { addScore(-1); if(state.currentLevel===3) next($('levelArea')); });
+  }
+  function answer(txn){
+    const debit = $('l3-debit').value;
+    const credit = $('l3-credit').value;
+    const amt = Number($('l3-amt').value);
+    if(debit===txn.debit && credit===txn.credit && amt===txn.amount){ addScore(4); showFeedback('Perfect Journal Entry', true); }
+    else { addScore(-2); showFeedback(`Wrong. Correct: ${txn.debit} Dr, ${txn.credit} Cr, ₹${txn.amount}`, false); }
+    setTimeout(()=> { if(state.currentLevel===3) next($('levelArea')); }, 900);
+  }
+  return { init };
+})();
+
+/* =========================
+   LEVEL 4 MODULE (Ledger Posting) - draggable T-account (one-account-at-time)
+   ========================= */
+const level4ledger = (function(){
+  let roundCardCounter = 0;
+  function init(container){
+    state.round = 0; next(container);
+  }
+  function next(container){
+    state.round++;
+    $('roundInfo').innerText = `Round ${state.round}/${state.maxRounds[4]}`;
+    if(state.round > state.maxRounds[4]) return finish(4);
+    // pick an account and its related txns
+    const acc = random(accounts);
+    const related = transactions.filter(t => t.debit === acc || t.credit === acc);
+    if(related.length === 0){ if(state.currentLevel===4) next(container); return; }
+    container.innerHTML = `
+      <div class="transaction"><b>Ledger Account:</b> ${acc}</div>
+      <div class="muted" style="margin-top:8px">Drag entries to the correct side (Debit or Credit) within <b>${acc}</b>.</div>
+      <div id="ledgerCards" style="margin-top:12px"></div>
+      <div class="drop-flex" style="margin-top:10px">
+        <div style="flex:1"><div class="muted">Debit</div><div id="debitZone" class="dropzone" ondragover="event.preventDefault()" ondrop="globalDrop(event,'debit')"></div></div>
+        <div style="flex:1"><div class="muted">Credit</div><div id="creditZone" class="dropzone" ondragover="event.preventDefault()" ondrop="globalDrop(event,'credit')"></div></div>
+      </div>
+      <div style="margin-top:12px">
+        <button id="checkLedgerBtn">Check Ledger</button>
+        <button id="skipLedgerBtn" class="alt">Skip (-1)</button>
+      </div>
+    `;
+    // create cards
+    const cardHolder = $('ledgerCards');
+    related.forEach((t, idx) => {
+      const id = `ld_${Date.now()}_${roundCardCounter++}_${idx}`;
+      const c = document.createElement('div');
+      c.id = id; c.className = 'draggable'; c.draggable = true;
+      c.textContent = t.text;
+      // store correct side relative to this ledger
+      c.dataset.correct = (t.debit === acc) ? 'debit' : 'credit';
+      c.dataset.txtext = t.text;
+      c.addEventListener('dragstart', ev => ev.dataTransfer.setData('text/plain', id));
+      cardHolder.appendChild(c);
+    });
+    $('checkLedgerBtn').addEventListener('click', ()=> checkLedger(acc));
+    $('skipLedgerBtn').addEventListener('click', ()=> { addScore(-1); if(state.currentLevel===4) next($('levelArea')); });
+  }
+
+  // global drop event (used by the page)
+  window.globalDrop = function(ev, side){
+    ev.preventDefault();
+    const id = ev.dataTransfer.getData('text/plain');
+    const el = document.getElementById(id);
+    if(!el) return;
+    ev.currentTarget.appendChild(el);
+    el.dataset.placed = side;
+  };
+
+  function checkLedger(acc){
+    const fb = $('feedbackArea');
+    const cards = Array.from(document.querySelectorAll('#debitZone .draggable, #creditZone .draggable'));
+    if(cards.length === 0){ showFeedback('Place at least one entry.', false); return; }
+    let total = 0, correct = 0;
+    cards.forEach(c => {
+      total++;
+      const placed = c.dataset.placed;
+      const correctSide = c.dataset.correct;
+      if(placed === correctSide){ correct++; addScore(3); } else { addScore(-1); }
+    });
+    showFeedback(`${correct}/${total} correct for ${acc}`, correct === total);
+    setTimeout(()=> { if(state.currentLevel===4) next($('levelArea')); }, 900);
+  }
+
+  return { init };
+})();
+
+/* =========================
+   LEVEL 5 MODULE (Trial Balance)
+   ========================= */
+const level5trial = (function(){
+  function init(container){
+    render(container);
+  }
+  function render(container){
+    $('roundInfo').innerText = `Trial`;
+    let html = `<div class="muted"><b>Assign each account to Debit or Credit column</b></div>
+      <table><thead><tr><th>Account</th><th>Amount</th><th>Place</th></tr></thead><tbody>`;
+    for(let i=0;i<tbItems.length;i++){
+      html += `<tr><td>${tbItems[i].account}</td><td>₹${tbItems[i].amount}</td><td>
+        <label><input name="place${i}" type="radio" value="debit"> Debit</label>
+        <label style="margin-left:6px"><input name="place${i}" type="radio" value="credit"> Credit</label>
+      </td></tr>`;
+    }
+    html += `</tbody></table><div style="margin-top:10px"><button id="checkTrialBtn">Check Trial Balance</button></div>`;
+    container.innerHTML = html;
+    $('checkTrialBtn').addEventListener('click', checkTrial);
+  }
+  function checkTrial(){
+    const creditKeywords = ['Sales','Capital','Raj','Aman'];
+    let debitTotal = 0, creditTotal = 0;
+    for(let i=0;i<tbItems.length;i++){
+      const radios = document.getElementsByName('place'+i);
+      let chosen = null;
+      for(const r of radios) if(r.checked) chosen = r.value;
+      if(!chosen){ alert('Choose Debit/Credit for all rows'); return; }
+      if(chosen === 'debit') debitTotal += tbItems[i].amount; else creditTotal += tbItems[i].amount;
+      const acc = tbItems[i].account;
+      const correct = (creditKeywords.some(k=>acc.includes(k)) || acc.includes('Capital') || acc.includes('Sales')) ? 'credit' : 'debit';
+      if(chosen === correct) addScore(2); else addScore(-1);
+    }
+    const balanced = (debitTotal === creditTotal);
+    showFeedback(`Debit ₹${debitTotal} | Credit ₹${creditTotal}` + (balanced ? ' — Balanced' : ' — Imbalance'), balanced);
+    if(balanced) addScore(5);
+    setTimeout(()=> finish(5), 900);
+  }
+  return { init };
+})();
+
+/* =========================
+   LEVEL 6 MODULE (Balance Sheet)
+   ========================= */
+const level6balance = (function(){
+  function init(container){
+    render(container);
+  }
+  function render(container){
+    $('roundInfo').innerText = `Balance Sheet`;
+    let html = `<div class="muted"><b>Classify each account as Asset or Liability/Capital</b></div>`;
+    closingBalances.forEach((cb,i)=>{
+      html += `<div style="margin-top:8px">${cb.account} — ₹${cb.amount}
+        <select id="place${i}" style="margin-left:8px">
+          <option value="">Select</option><option value="asset">Asset</option><option value="liab">Liability/Capital</option>
+        </select>
+      </div>`;
+    });
+    html += `<div style="margin-top:10px"><button id="checkBalanceBtn">Check Balance Sheet</button></div>`;
+    container.innerHTML = html;
+    $('checkBalanceBtn').addEventListener('click', checkBalance);
+  }
+  function checkBalance(){
+    let assets=0, liabs=0;
+    for(let i=0;i<closingBalances.length;i++){
+      const sel = $('place'+i).value;
+      if(!sel){ alert('Classify all accounts'); return; }
+      if(sel==='asset') assets += closingBalances[i].amount; else liabs += closingBalances[i].amount;
+      const acc = closingBalances[i].account.toLowerCase();
+      const shouldBe = (acc.includes('capital')||acc.includes('sales')||acc.includes('raj')||acc.includes('aman')) ? 'liab' : 'asset';
+      if(sel===shouldBe) addScore(2); else addScore(-1);
+    }
+    const balanced = assets === liabs;
+    showFeedback(`Assets ₹${assets} | Liab ₹${liabs}` + (balanced ? ' — BALANCED — You win!' : ' — Not balanced'), balanced);
+    if(balanced){ addScore(10); promptSaveScore(); }
+    setTimeout(()=> finish(6), 900);
+  }
+  return { init };
+})();
+
+/* =========================
+   Finish + Leaderboard (same behavior)
+   ========================= */
+function finish(n){
+  alert(`Level ${n} finished. Score: ${state.score}`);
+  applyUnlocks();
+  for(let i=n+1;i<=6;i++){
+    if(state.unlocked[i]){ state.currentLevel = i; renderCurrentLevel(); return; }
+  }
+  state.currentLevel = 1; renderCurrentLevel();
+}
+
+function promptSaveScore(){
+  const final = state.score;
+  const name = prompt(`You scored ${final} points. Enter name to save (Cancel to skip).`, "Player");
+  if(!name) return;
+  try{
+    const raw = localStorage.getItem('bq_leaderboard');
+    const board = raw ? JSON.parse(raw) : [];
+    board.push({name: name.substring(0,20), score: final, date: new Date().toISOString()});
+    board.sort((a,b)=>b.score - a.score);
+    if(board.length>20) board.splice(20);
+    localStorage.setItem('bq_leaderboard', JSON.stringify(board));
+    alert('Saved to leaderboard.');
+  }catch(e){ console.error(e); }
+}
+function showLeaderboard(){
+  const raw = localStorage.getItem('bq_leaderboard');
+  const board = raw ? JSON.parse(raw) : [];
+  if(board.length === 0){ alert('Leaderboard empty. Complete Balance Sheet to save your score.'); return; }
+  let msg = '🏆 Leaderboard:\n\n';
+  for(let i=0;i<Math.min(10,board.length);i++){
+    const r = board[i];
+    msg += `${i+1}. ${r.name} — ${r.score} pts (${(new Date(r.date)).toLocaleDateString()})\n`;
+  }
+  alert(msg);
+}
+
+/* =========================
+   Init + persistence
+   ========================= */
+(function init(){
+  try{
+    const raw = JSON.parse(localStorage.getItem('bq_core_state')||'null');
+    if(raw){ state.score = raw.score || 0; state.unlocked = raw.unlocked || state.unlocked; state.currentLevel = raw.currentLevel || 1; }
+  }catch(e){}
+  setScore(state.score);
+  renderLevelsList();
+  renderCurrentLevel();
+  setInterval(()=> localStorage.setItem('bq_core_state', JSON.stringify({score:state.score, unlocked:state.unlocked, currentLevel:state.currentLevel})), 2000);
+})();
+</script>
+</body>
+</html>
