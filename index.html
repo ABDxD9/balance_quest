@@ -347,11 +347,24 @@ const level1 = (function(){
     $('l1-credit').addEventListener('click', ()=> { answer('credit', txn); });
   }
   function answer(choice, txn){
-    const correctSide = 'debit';
-    if(choice === correctSide){ addScore(1); showFeedback('Correct — Debit side', true); }
-    else { addScore(-1); showFeedback(`Wrong — debit is ${txn.debit}`, false); }
-    setTimeout(()=> { if(state.currentLevel===1) next($('levelArea')); }, 700);
+  const correctSide =
+    txn.type === 'nominal' ? 'debit' :
+    txn.type === 'real' ? 'debit' :
+    txn.type === 'personal' ? 'credit' : 'debit';
+
+  if(choice === correctSide){
+    addScore(1);
+    showFeedback(`Correct — ${correctSide.toUpperCase()} side`, true);
+  } else {
+    addScore(-1);
+    showFeedback(`Wrong — correct is ${correctSide.toUpperCase()}`, false);
   }
+
+  setTimeout(()=> {
+    if(state.currentLevel===1) next($('levelArea'));
+  }, 700);
+}
+
   return { init };
 })();
 
@@ -638,5 +651,6 @@ function showLeaderboard(){
 </script>
 </body>
 </html>
+
 
 
